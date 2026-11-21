@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Roadside Flora</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Roadside Flora">
+<meta name="theme-color" content="#0b6b52">
+<link rel="apple-touch-icon" href="icon.png">
+<link rel="icon" href="icon.png">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+:root {
+  --bg: #eef1ec; --panel: #f8faf6; --ink: #14251f; --muted: #5a6b63; --line: #c9d3c8;
+  --accent: #0b6b52; --accent-ink: #fff; --pin: #e2620a;
+  --native: #0b6b52; --native-bg: #d5ebe1; --warn: #8a5a00; --warn-bg: #f6e6bd; --bad: #a3271c;
+  --plain-bg: #e3e8e1;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0e1613; --panel: #141f1b; --ink: #e6efe9; --muted: #94a69d; --line: #2b3a34;
+    --accent: #3fbf97; --accent-ink: #062018; --pin: #ff8a2b;
+    --native: #7fdcb9; --native-bg: #173a2e; --warn: #f0c865; --warn-bg: #3d3113; --bad: #ff9c8f;
+    --plain-bg: #223029; color-scheme: dark;
+  }
+}
+*, *::before, *::after { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--bg); color: var(--ink);
+  font: 16px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  display: flex; flex-direction: column; overflow: hidden;
+}
+button, select { font: inherit; color: inherit; }
+[hidden] { display: none !important; }
+:focus-visible { outline: 3px solid var(--pin); outline-offset: 2px; }
+
+#map { flex: 0 0 46%; min-height: 240px; background: var(--plain-bg); border-bottom: 1px solid var(--line); z-index: 0; }
+.pin { filter: drop-shadow(0 2px 2px rgba(0,0,0,.35)); }
+
+.panel {
+  flex: 1 1 0; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; background: var(--panel);
+  padding: 14px max(16px, env(safe-area-inset-right, 0px)) calc(24px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+}
+.inner { max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
+.locate {
+  height: 58px; border: 0; border-radius: 12px; background: var(--accent); color: var(--accent-ink);
+  font-size: 19px; font-weight: 800; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px;
+}
+.locate svg { width: 22px; height: 22px; }
+.locate:disabled { opacity: .6; }
+.opts { display: flex; gap: 8px; }
+.opts select {
+  flex: 1 1 0; min-width: 0; height: 46px; padding: 0 10px; border-radius: 10px;
+  border: 1px solid var(--line); background: var(--bg); font-size: 16px;
+}
+.status { margin: 0; color: var(--muted); font-size: 15px; }
+.status.err { color: var(--bad); }
+h1 { margin: 2px 0 0; font-size: 20px; font-weight: 800; line-height: 1.2; }
+.sub { margin: 0; color: var(--muted); font-size: 13.5px; font-variant-numeric: tabular-nums; }
+
+.plants { list-style: none; margin: 0; padding: 0; }
+.plants li { border-top: 1px solid var(--line); }
+.plants li:first-child { border-top: 0; }
+.plants a { display: grid; grid-template-columns: 72px 1fr; gap: 12px; padding: 12px 0; color: inherit; text-decoration: none; align-items: center; }
+.plants img, .plants .noimg { width: 72px; height: 72px; border-radius: 10px; object-fit: cover; background: var(--plain-bg); display: block; }
+.txt { min-width: 0; display: grid; gap: 2px; }
+.name { font-size: 18px; font-weight: 800; line-height: 1.2; }
+.sci { font-family: Georgia, "Times New Roman", serif; font-style: italic; color: var(--muted); font-size: 15.5px; }
+.meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 3px; font-size: 13px; color: var(--muted); }
+.chip { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 99px; background: var(--plain-bg); color: var(--ink); text-transform: capitalize; }
+.chip.native, .chip.endemic { background: var(--native-bg); color: var(--native); }
+.chip.introduced { background: var(--warn-bg); color: var(--warn); }
+.photo-link {
+  display: block; text-align: center; padding: 14px; border-radius: 12px; border: 2px solid var(--ink);
+  color: var(--ink); font-weight: 800; text-decoration: none;
+}
+.foot { margin: 4px 0 0; font-size: 12.5px; color: var(--muted); }
+.foot a { color: inherit; }
+</style>
+</head>
+<body>
+<div id="map" aria-label="Map. Tap to choose a spot."></div>
+<div class="panel"><div class="inner">
+  <button class="locate" id="locate" type="button">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="6"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>
+    <span id="locateText">Use my location</span>
+  </button>
+  <div class="opts">
+    <select id="radius" aria-label="Search distance">
+      <option value="1">Within 1 mile</option>
+      <option value="3" selected>Within 3 miles</option>
+      <option value="10">Within 10 miles</option>
+      <option value="25">Within 25 miles</option>
+    </select>
+    <select id="season" aria-label="Time of year">
+      <option value="now" selected>Seen this season</option>
+      <option value="all">Seen any time</option>
+    </select>
+  </div>
+  <p class="status" id="status">Tap “Use my location”, or tap the map, to see plants recorded nearby.</p>
+  <div id="head" hidden><h1 id="title"></h1><p class="sub" id="sub"></p></div>
+  <ul class="plants" id="list"></ul>
+  <a class="photo-link" href="https://claude.ai/artifact/FRCYQo3imkCstWyUamaf6b" target="_blank" rel="noopener">Identify from a photo (opens Claude)</a>
+  <p class="foot">Sightings come from <a href="https://www.inaturalist.org" target="_blank" rel="noopener">iNaturalist</a> community records, most-recorded first. Tap a plant for more. Hand the phone to a passenger or pull over before using this.</p>
+</div></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(() => {
+"use strict";
+const $ = id => document.getElementById(id);
+const statusEl = $("status"), listEl = $("list"), locBtn = $("locate");
+const say = (m, err) => { statusEl.textContent = m; statusEl.hidden = !m; statusEl.classList.toggle("err", !!err); };
+const store = { get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (_) { return null; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) {} } };
+
+if (!window.L) { say("The map couldn't load. Check your connection and reload.", true); return; }
+
+const last = store.get("rf.last");
+const map = L.map("map", { zoomControl: true, attributionControl: true })
+  .setView(last ? [last.lat, last.lng] : [37.2, -119.6], last ? 13 : 6);
+L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+}).addTo(map);
+const pinIcon = L.divIcon({
+  className: "pin", iconSize: [30, 40], iconAnchor: [15, 39],
+  html: '<svg width="30" height="40" viewBox="0 0 30 40"><path d="M15 39C12 28 2 24 2 14a13 13 0 0 1 26 0c0 10-10 14-13 25z" fill="#e2620a" stroke="#fff" stroke-width="2"/><circle cx="15" cy="14" r="5" fill="#fff"/></svg>'
+});
+let marker = null, ring = null, spot = null, reqId = 0;
+
+const miles = () => +$("radius").value;
+function place(lat, lng, zoomTo) {
+  spot = { lat, lng }; store.set("rf.last", spot);
+  if (!marker) marker = L.marker([lat, lng], { icon: pinIcon }).addTo(map); else marker.setLatLng([lat, lng]);
+  const meters = miles() * 1609.34;
+  if (!ring) ring = L.circle([lat, lng], { radius: meters, color: "#e2620a", weight: 1.5, fillOpacity: .06, interactive: false }).addTo(map);
+  else { ring.setLatLng([lat, lng]); ring.setRadius(meters); }
+  if (zoomTo) map.setView([lat, lng], Math.max(map.getZoom(), miles() <= 3 ? 13 : 11));
+  lookup();
+}
+map.on("click", e => place(e.latlng.lat, e.latlng.lng, false));
+
+locBtn.onclick = () => {
+  if (!navigator.geolocation) { say("This browser can't share your location. Tap the map instead.", true); return; }
+  locBtn.disabled = true; $("locateText").textContent = "Finding you…";
+  navigator.geolocation.getCurrentPosition(
+    p => { done(); place(p.coords.latitude, p.coords.longitude, true); },
+    err => {
+      done();
+      say(err.code === 1
+        ? "Location is turned off for this page. Allow it in your browser's site settings, or tap the map instead."
+        : "Couldn't get a GPS fix. Try again, or tap the map instead.", true);
+    },
+    { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 }
+  );
+  function done() { locBtn.disabled = false; $("locateText").textContent = "Use my location"; }
+};
+$("radius").onchange = () => { if (spot) place(spot.lat, spot.lng, true); };
+$("season").onchange = () => { if (spot) lookup(); };
+
+function seasonMonths() {
+  const m = new Date().getMonth() + 1;
+  return [((m + 10) % 12) + 1, m, (m % 12) + 1].join(",");
+}
+async function lookup() {
+  const id = ++reqId, seasonal = $("season").value === "now";
+  const q = new URLSearchParams({
+    lat: spot.lat.toFixed(5), lng: spot.lng.toFixed(5), radius: (miles() * 1.60934).toFixed(2),
+    iconic_taxa: "Plantae", quality_grade: "research", per_page: "40", preferred_place_id: "14", locale: "en"
+  });
+  if (seasonal) q.set("month", seasonMonths());
+  say("Looking up plants recorded here…"); listEl.replaceChildren(); $("head").hidden = true;
+  let data;
+  try {
+    const r = await fetch("https://api.inaturalist.org/v1/observations/species_counts?" + q);
+    if (!r.ok) throw new Error(r.status);
+    data = await r.json();
+  } catch (_) {
+    if (id === reqId) say("Couldn't reach the plant records. Check your signal and try again.", true);
+    return;
+  }
+  if (id !== reqId) return;
+  const rows = (data.results || []).filter(x => x && x.taxon);
+  $("title").textContent = rows.length ? `${data.total_results || rows.length} kinds of plants recorded here` : "No plant records here";
+  $("sub").textContent = `${spot.lat.toFixed(4)}, ${spot.lng.toFixed(4)} · within ${miles()} mi · ${seasonal ? "this time of year" : "any time of year"}`;
+  $("head").hidden = false;
+  if (!rows.length) { say(seasonal ? "Nothing recorded this season. Try “Seen any time” or a wider distance." : "Nothing recorded this close. Try a wider distance."); return; }
+  say(rows.length < 6 ? "Only a few records here. A wider distance will show more." : "");
+  const frag = document.createDocumentFragment();
+  for (const row of rows) frag.append(item(row));
+  listEl.replaceChildren(frag);
+}
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+function item(row) {
+  const t = row.taxon, li = el("li"), a = el("a");
+  a.href = "https://www.inaturalist.org/taxa/" + encodeURIComponent(t.id); a.target = "_blank"; a.rel = "noopener";
+  const src = t.default_photo && (t.default_photo.square_url || t.default_photo.url);
+  if (src && /^https:\/\//.test(src)) { const img = el("img"); img.src = src; img.alt = ""; img.loading = "lazy"; a.append(img); }
+  else a.append(el("div", "noimg"));
+  const txt = el("div", "txt"), common = t.preferred_common_name;
+  txt.append(el("span", "name", common ? common.replace(/^./, c => c.toUpperCase()) : t.name));
+  if (common) txt.append(el("span", "sci", t.name));
+  const meta = el("div", "meta");
+  const em = t.preferred_establishment_means || (t.establishment_means && t.establishment_means.establishment_means);
+  if (typeof em === "string" && em) meta.append(el("span", "chip " + (["native", "endemic", "introduced"].includes(em) ? em : ""), em));
+  meta.append(el("span", null, `${row.count} sighting${row.count === 1 ? "" : "s"}`));
+  txt.append(meta); a.append(txt); li.append(a);
+  return li;
+}
+if (last) place(last.lat, last.lng, false);
+})();
+</script>
+</body>
+</html>
