@@ -6,105 +6,120 @@
 <title>Roadside Flora</title>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Roadside Flora">
-<meta name="theme-color" content="#0b6b52">
+<meta name="theme-color" content="#11170f">
 <link rel="apple-touch-icon" href="icon.png">
 <link rel="icon" href="icon.png">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&display=swap">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
 :root {
-  --bg: #eef1ec; --panel: #f8faf6; --ink: #14251f; --muted: #5a6b63; --line: #c9d3c8;
-  --accent: #0b6b52; --accent-ink: #fff; --pin: #e2620a;
-  --native: #0b6b52; --native-bg: #d5ebe1; --warn: #8a5a00; --warn-bg: #f6e6bd; --bad: #a3271c;
-  --plain-bg: #e3e8e1;
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0e1613; --panel: #141f1b; --ink: #e6efe9; --muted: #94a69d; --line: #2b3a34;
-    --accent: #3fbf97; --accent-ink: #062018; --pin: #ff8a2b;
-    --native: #7fdcb9; --native-bg: #173a2e; --warn: #f0c865; --warn-bg: #3d3113; --bad: #ff9c8f;
-    --plain-bg: #223029; color-scheme: dark;
-  }
+  color-scheme: dark;
+  --bg: #11170f; --sheet: #161e14; --raise: #1f2a1c; --line: #2e3b2a;
+  --ink: #f2efe3; --muted: #a3ad98; --lime: #c9e56a; --lime-ink: #18200c; --pin: #ff7a1a; --bad: #ff9c8f;
+  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
 }
 *, *::before, *::after { box-sizing: border-box; }
 html, body { height: 100%; margin: 0; }
 body {
-  background: var(--bg); color: var(--ink);
+  background: var(--bg); color: var(--ink); overflow: hidden;
   font: 16px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  display: flex; flex-direction: column; overflow: hidden;
+  display: flex; flex-direction: column;
 }
 button, select { font: inherit; color: inherit; }
 [hidden] { display: none !important; }
 :focus-visible { outline: 3px solid var(--pin); outline-offset: 2px; }
 
-#map { flex: 0 0 46%; min-height: 240px; background: var(--plain-bg); border-bottom: 1px solid var(--line); z-index: 0; }
-.pin { filter: drop-shadow(0 2px 2px rgba(0,0,0,.35)); }
-
-.panel {
-  flex: 1 1 0; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; background: var(--panel);
-  padding: 14px max(16px, env(safe-area-inset-right, 0px)) calc(24px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+.mapwrap { position: relative; flex: 0 0 50%; min-height: 250px; }
+#map { position: absolute; inset: 0; background: #20281d; z-index: 0; }
+.pin { filter: drop-shadow(0 3px 3px rgba(0,0,0,.5)); }
+.brand {
+  position: absolute; z-index: 500; left: max(12px, env(safe-area-inset-left, 0px)); top: calc(10px + env(safe-area-inset-top, 0px));
+  font-family: var(--display); font-weight: 800; font-size: 17px; letter-spacing: -.01em;
+  background: rgba(17,23,15,.82); padding: 7px 12px; border-radius: 99px; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  pointer-events: none;
 }
-.inner { max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
+.brand i { font-style: normal; color: var(--lime); }
+.layer {
+  position: absolute; z-index: 500; right: max(12px, env(safe-area-inset-right, 0px)); top: calc(10px + env(safe-area-inset-top, 0px));
+  height: 40px; padding: 0 14px; border-radius: 99px; border: 0; cursor: pointer; font-weight: 700; font-size: 14px;
+  background: rgba(17,23,15,.82); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+}
+.leaflet-top.leaflet-left { top: calc(52px + env(safe-area-inset-top, 0px)); }
+
+.sheet {
+  flex: 1 1 0; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  background: var(--sheet); border-radius: 22px 22px 0 0; margin-top: -20px; position: relative; z-index: 600;
+  box-shadow: 0 -10px 30px rgba(0,0,0,.45);
+  padding: 18px max(16px, env(safe-area-inset-right, 0px)) calc(24px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+}
+.inner { max-width: 620px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+.row { display: flex; gap: 10px; }
 .locate {
-  height: 58px; border: 0; border-radius: 12px; background: var(--accent); color: var(--accent-ink);
-  font-size: 19px; font-weight: 800; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px;
+  flex: 1 1 0; min-width: 0; height: 58px; border: 0; border-radius: 16px; background: var(--lime); color: var(--lime-ink);
+  font-family: var(--display); font-size: 19px; font-weight: 800; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 10px;
 }
 .locate svg { width: 22px; height: 22px; }
 .locate:disabled { opacity: .6; }
-.opts { display: flex; gap: 8px; }
-.opts select {
-  flex: 1 1 0; min-width: 0; height: 46px; padding: 0 10px; border-radius: 10px;
-  border: 1px solid var(--line); background: var(--bg); font-size: 16px;
+select {
+  flex: 0 0 auto; height: 58px; padding: 0 12px; border-radius: 16px; border: 1px solid var(--line);
+  background: var(--raise); font-size: 16px; font-weight: 600;
 }
 .status { margin: 0; color: var(--muted); font-size: 15px; }
 .status.err { color: var(--bad); }
-h1 { margin: 2px 0 0; font-size: 20px; font-weight: 800; line-height: 1.2; }
-.sub { margin: 0; color: var(--muted); font-size: 13.5px; font-variant-numeric: tabular-nums; }
 
-.plants { list-style: none; margin: 0; padding: 0; }
-.plants li { border-top: 1px solid var(--line); }
-.plants li:first-child { border-top: 0; }
-.plants a { display: grid; grid-template-columns: 72px 1fr; gap: 12px; padding: 12px 0; color: inherit; text-decoration: none; align-items: center; }
-.plants img, .plants .noimg { width: 72px; height: 72px; border-radius: 10px; object-fit: cover; background: var(--plain-bg); display: block; }
-.txt { min-width: 0; display: grid; gap: 2px; }
-.name { font-size: 18px; font-weight: 800; line-height: 1.2; }
-.sci { font-family: Georgia, "Times New Roman", serif; font-style: italic; color: var(--muted); font-size: 15.5px; }
-.meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 3px; font-size: 13px; color: var(--muted); }
-.chip { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 99px; background: var(--plain-bg); color: var(--ink); text-transform: capitalize; }
-.chip.native, .chip.endemic { background: var(--native-bg); color: var(--native); }
-.chip.introduced { background: var(--warn-bg); color: var(--warn); }
-.photo-link {
-  display: block; text-align: center; padding: 14px; border-radius: 12px; border: 2px solid var(--ink);
-  color: var(--ink); font-weight: 800; text-decoration: none;
-}
-.foot { margin: 4px 0 0; font-size: 12.5px; color: var(--muted); }
+.hero { border-radius: 18px; padding: 16px 18px 18px; background: var(--raise); border-left: 10px solid var(--c, var(--line)); }
+.hero small { display: block; font-size: 12px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.hero b { display: block; font-family: var(--display); font-weight: 800; font-size: clamp(30px, 9vw, 42px); line-height: 1.02; letter-spacing: -.02em; margin-top: 6px; text-wrap: balance; }
+.hero span { display: block; margin-top: 6px; color: var(--muted); font-size: 15px; }
+
+h2 { margin: 6px 0 0; font-family: var(--display); font-size: 17px; font-weight: 800; }
+.bar { display: flex; height: 16px; border-radius: 99px; overflow: hidden; background: var(--raise); gap: 2px; }
+.bar i { display: block; min-width: 3px; }
+.crops { list-style: none; margin: 0; padding: 0; }
+.crops li { display: grid; grid-template-columns: 18px 1fr auto; gap: 12px; align-items: center; padding: 13px 0; border-top: 1px solid var(--line); }
+.crops li:first-child { border-top: 0; }
+.sw { width: 18px; height: 18px; border-radius: 6px; }
+.cn { min-width: 0; }
+.cn b { display: block; font-size: 18px; font-weight: 700; line-height: 1.2; }
+.cn span { color: var(--muted); font-size: 13.5px; }
+.pct { font-family: var(--display); font-weight: 800; font-size: 20px; font-variant-numeric: tabular-nums; }
+.foot { margin: 2px 0 0; font-size: 12.5px; color: var(--muted); }
 .foot a { color: inherit; }
+#debug { opacity: .75; word-break: break-word; }
 </style>
 </head>
 <body>
-<div id="map" aria-label="Map. Tap to choose a spot."></div>
-<div class="panel"><div class="inner">
-  <button class="locate" id="locate" type="button">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="6"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>
-    <span id="locateText">Use my location</span>
-  </button>
-  <div class="opts">
-    <select id="radius" aria-label="Search distance">
-      <option value="1">Within 1 mile</option>
-      <option value="3" selected>Within 3 miles</option>
-      <option value="10">Within 10 miles</option>
-      <option value="25">Within 25 miles</option>
-    </select>
-    <select id="season" aria-label="Time of year">
-      <option value="now" selected>Seen this season</option>
-      <option value="all">Seen any time</option>
+<div class="mapwrap">
+  <div id="map" aria-label="Map. Tap a field to see what is grown there."></div>
+  <div class="brand">Roadside <i>Flora</i></div>
+  <button class="layer" id="layer" type="button">Street map</button>
+</div>
+<div class="sheet"><div class="inner">
+  <div class="row">
+    <button class="locate" id="locate" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="6"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>
+      <span id="locateText">What's growing here?</span>
+    </button>
+    <select id="radius" aria-label="How far around you">
+      <option value="0.25">¼ mi</option>
+      <option value="0.5" selected>½ mi</option>
+      <option value="1">1 mi</option>
+      <option value="2">2 mi</option>
     </select>
   </div>
-  <p class="status" id="status">Tap “Use my location”, or tap the map, to see plants recorded nearby.</p>
-  <div id="head" hidden><h1 id="title"></h1><p class="sub" id="sub"></p></div>
-  <ul class="plants" id="list"></ul>
-  <a class="photo-link" href="https://claude.ai/artifact/FRCYQo3imkCstWyUamaf6b" target="_blank" rel="noopener">Identify from a photo (opens Claude)</a>
-  <p class="foot">Sightings come from <a href="https://www.inaturalist.org" target="_blank" rel="noopener">iNaturalist</a> community records, most-recorded first. Tap a plant for more. Hand the phone to a passenger or pull over before using this.</p>
+  <p class="status" id="status">Tap the button to use your location, or tap a field on the map.</p>
+  <div class="hero" id="hero" hidden><small id="heroLabel"></small><b id="heroName"></b><span id="heroSub"></span></div>
+  <div id="around" hidden>
+    <h2 id="aroundTitle"></h2>
+    <div class="bar" id="bar" style="margin-top:10px"></div>
+    <ul class="crops" id="list"></ul>
+  </div>
+  <p class="foot">Crop fields come from California's statewide crop survey (Dept. of Water Resources and Land IQ). It maps farmland only, and fields change between survey years. Hand the phone to a passenger or pull over before using this. <a href="https://claude.ai/artifact/FRCYQo3imkCstWyUamaf6b" target="_blank" rel="noopener">Identify a plant from a photo</a>.</p>
+  <p class="foot" id="debug"></p>
 </div></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -112,102 +127,205 @@ h1 { margin: 2px 0 0; font-size: 20px; font-weight: 800; line-height: 1.2; }
 (() => {
 "use strict";
 const $ = id => document.getElementById(id);
-const statusEl = $("status"), listEl = $("list"), locBtn = $("locate");
+const statusEl = $("status"), locBtn = $("locate");
 const say = (m, err) => { statusEl.textContent = m; statusEl.hidden = !m; statusEl.classList.toggle("err", !!err); };
+const dbg = m => { $("debug").textContent = m; };
 const store = { get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (_) { return null; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) {} } };
-
 if (!window.L) { say("The map couldn't load. Check your connection and reload.", true); return; }
 
+/* ---------- crop legend (CA DWR land-use codes) ---------- */
+const CLASSES = {
+  V: ["Vineyard", "#a56be0"], D: ["Orchard", "#e39a3b"], C: ["Citrus & subtropical", "#ffb300"], G: ["Grain & hay", "#e6d16a"],
+  P: ["Pasture & alfalfa", "#63c36b"], F: ["Field crops", "#c9a27a"], T: ["Vegetables & berries", "#35c7a5"], R: ["Rice", "#5aa9f0"],
+  YP: ["Young orchard or vineyard", "#b7e08a"], I: ["Idle or fallow", "#8a8f86"], X: ["Unclassified farmland", "#8a8f86"], U: ["Urban", "#666"]
+};
+const CROPS = {
+  V: "Grapes", C: "Citrus", C4: "Dates", C5: "Avocados", C6: "Olives", C7: "Subtropical fruit", C8: "Kiwis",
+  D1: "Apples", D3: "Cherries", D5: "Peaches & nectarines", D6: "Pears", D7: "Plums", D8: "Prunes", D10: "Other tree fruit",
+  D12: "Almonds", D13: "Walnuts", D14: "Pistachios", D15: "Pomegranates", D16: "Plums, prunes & apricots",
+  F1: "Cotton", F2: "Safflower", F10: "Dry beans", F11: "Other field crops", F12: "Sunflowers", F16: "Corn, sorghum & sudan",
+  G2: "Wheat", G6: "Grain & hay", P1: "Alfalfa", P3: "Mixed pasture", P6: "Pasture grasses", R1: "Rice", R2: "Wild rice",
+  T4: "Cole crops (broccoli, cabbage)", T6: "Carrots", T9: "Melons, squash & cucumbers", T10: "Onions & garlic",
+  T15: "Tomatoes", T16: "Flowers & nursery", T18: "Other vegetables", T19: "Bush berries", T20: "Strawberries", T21: "Peppers",
+  T26: "Greenhouse", T27: "Blueberries", T30: "Lettuce & leafy greens", T31: "Potatoes", YP: "Young orchard or vineyard",
+  I: "Idle or fallow", I1: "Idle or fallow", I2: "Idle or fallow", X: "Unclassified farmland", U: "Urban"
+};
+const classOf = code => { const m = /^(YP|[A-Z])/.exec(String(code).toUpperCase()); return m && CLASSES[m[1]] ? m[1] : "X"; };
+function nameOf(code, domain) {
+  const c = String(code).trim();
+  const d = domain && (domain[c] || domain[c.toUpperCase()]);
+  if (d && !/^\*+$/.test(d)) return String(d).replace(/\s+/g, " ").trim();
+  if (CROPS[c.toUpperCase()]) return CROPS[c.toUpperCase()];
+  if (/^[A-Za-z]{1,2}\d{0,2}$/.test(c)) return CLASSES[classOf(c)][0];
+  return c;
+}
+
+/* ---------- map ---------- */
 const last = store.get("rf.last");
-const map = L.map("map", { zoomControl: true, attributionControl: true })
-  .setView(last ? [last.lat, last.lng] : [37.2, -119.6], last ? 13 : 6);
-L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-  maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-}).addTo(map);
+const map = L.map("map", { zoomControl: true }).setView(last ? [last.lat, last.lng] : [36.9, -119.9], last ? 15 : 7);
+const sat = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", { maxZoom: 19, attribution: "Imagery &copy; Esri" });
+const street = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' });
+let usingSat = store.get("rf.sat") !== false;
+(usingSat ? sat : street).addTo(map);
+const layerBtn = $("layer");
+const labelLayer = () => { layerBtn.textContent = usingSat ? "Street map" : "Satellite"; };
+labelLayer();
+layerBtn.onclick = () => {
+  map.removeLayer(usingSat ? sat : street); usingSat = !usingSat; (usingSat ? sat : street).addTo(map);
+  store.set("rf.sat", usingSat); labelLayer();
+};
 const pinIcon = L.divIcon({
   className: "pin", iconSize: [30, 40], iconAnchor: [15, 39],
-  html: '<svg width="30" height="40" viewBox="0 0 30 40"><path d="M15 39C12 28 2 24 2 14a13 13 0 0 1 26 0c0 10-10 14-13 25z" fill="#e2620a" stroke="#fff" stroke-width="2"/><circle cx="15" cy="14" r="5" fill="#fff"/></svg>'
+  html: '<svg width="30" height="40" viewBox="0 0 30 40"><path d="M15 39C12 28 2 24 2 14a13 13 0 0 1 26 0c0 10-10 14-13 25z" fill="#ff7a1a" stroke="#fff" stroke-width="2"/><circle cx="15" cy="14" r="5" fill="#fff"/></svg>'
 });
-let marker = null, ring = null, spot = null, reqId = 0;
-
+const fieldsLayer = L.layerGroup().addTo(map);
+let marker = null, spot = null, reqId = 0;
 const miles = () => +$("radius").value;
+
 function place(lat, lng, zoomTo) {
   spot = { lat, lng }; store.set("rf.last", spot);
   if (!marker) marker = L.marker([lat, lng], { icon: pinIcon }).addTo(map); else marker.setLatLng([lat, lng]);
-  const meters = miles() * 1609.34;
-  if (!ring) ring = L.circle([lat, lng], { radius: meters, color: "#e2620a", weight: 1.5, fillOpacity: .06, interactive: false }).addTo(map);
-  else { ring.setLatLng([lat, lng]); ring.setRadius(meters); }
-  if (zoomTo) map.setView([lat, lng], Math.max(map.getZoom(), miles() <= 3 ? 13 : 11));
+  if (zoomTo) map.setView([lat, lng], miles() <= 0.5 ? 15 : 14);
   lookup();
 }
 map.on("click", e => place(e.latlng.lat, e.latlng.lng, false));
-
 locBtn.onclick = () => {
   if (!navigator.geolocation) { say("This browser can't share your location. Tap the map instead.", true); return; }
   locBtn.disabled = true; $("locateText").textContent = "Finding you…";
+  const done = () => { locBtn.disabled = false; $("locateText").textContent = "What's growing here?"; };
   navigator.geolocation.getCurrentPosition(
     p => { done(); place(p.coords.latitude, p.coords.longitude, true); },
-    err => {
-      done();
-      say(err.code === 1
-        ? "Location is turned off for this page. Allow it in your browser's site settings, or tap the map instead."
-        : "Couldn't get a GPS fix. Try again, or tap the map instead.", true);
-    },
-    { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 }
-  );
-  function done() { locBtn.disabled = false; $("locateText").textContent = "Use my location"; }
+    err => { done(); say(err.code === 1
+      ? "Location is turned off for this page. Allow it in your browser's site settings, or tap the map instead."
+      : "Couldn't get a GPS fix. Try again, or tap the map instead.", true); },
+    { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 });
 };
 $("radius").onchange = () => { if (spot) place(spot.lat, spot.lng, true); };
-$("season").onchange = () => { if (spot) lookup(); };
 
-function seasonMonths() {
-  const m = new Date().getMonth() + 1;
-  return [((m + 10) % 12) + 1, m, (m % 12) + 1].join(",");
+/* ---------- crop survey service (found at run time) ---------- */
+const ROOT = "https://gis.water.ca.gov/arcgis/rest/services/Planning";
+async function getJSON(url) {
+  const r = await fetch(url); if (!r.ok) throw new Error("HTTP " + r.status);
+  const j = await r.json(); if (j && j.error) throw new Error(j.error.message || "service error"); return j;
 }
+async function describe(svcUrl, year) {
+  const svc = await getJSON(svcUrl + "?f=json");
+  const layerId = svc.layers && svc.layers.length ? svc.layers[0].id : 0;
+  const layer = await getJSON(`${svcUrl}/${layerId}?f=json`);
+  const fields = layer.fields || [], by = n => fields.find(f => f.name.toUpperCase() === n);
+  const crop = ["MAIN_CROP", "CROPTYP2", "CROPTYP1", "CLASS2", "CLASS1"].map(by).find(Boolean)
+    || fields.find(f => /CROP/i.test(f.name) && /String/.test(f.type));
+  if (!crop) throw new Error("no crop field in " + svcUrl);
+  const acres = fields.find(f => /^ACRES$/i.test(f.name)) || fields.find(f => /ACRES/i.test(f.name));
+  const domain = {};
+  if (crop.domain && crop.domain.codedValues) for (const cv of crop.domain.codedValues) domain[String(cv.code).trim()] = cv.name;
+  return { url: `${svcUrl}/${layerId}`, crop: crop.name, acres: acres ? acres.name : null, domain, year, t: Date.now() };
+}
+let svcPromise = null;
+function service() {
+  if (svcPromise) return svcPromise;
+  const cached = store.get("rf.svc");
+  if (cached && cached.url && Date.now() - cached.t < 7 * 864e5) return (svcPromise = Promise.resolve(cached));
+  svcPromise = (async () => {
+    let found = [];
+    try {
+      const dir = await getJSON(ROOT + "?f=json");
+      for (const s of dir.services || []) {
+        const m = /i15_Crop_Mapping_(\d{4})(.*)$/i.exec(s.name);
+        if (m) found.push({ year: +m[1], prov: /prov/i.test(m[2]) ? 1 : 0, url: `${ROOT}/${s.name.split("/").pop()}/${s.type}`, fs: s.type === "FeatureServer" ? 0 : 1 });
+      }
+      found.sort((a, b) => b.year - a.year || a.prov - b.prov || a.fs - b.fs);
+    } catch (_) { /* fall through to guesses */ }
+    if (!found.length) for (let y = new Date().getFullYear(); y >= 2018; y--) found.push({ year: y, url: `${ROOT}/i15_Crop_Mapping_${y}/FeatureServer` });
+    let lastErr;
+    for (const f of found.slice(0, 8)) {
+      try { const d = await describe(f.url, f.year); store.set("rf.svc", d); return d; } catch (e) { lastErr = e; }
+    }
+    throw lastErr || new Error("crop survey not found");
+  })();
+  svcPromise.catch(() => { svcPromise = null; });
+  return svcPromise;
+}
+
+const inRing = (lng, lat, ring) => {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const a = ring[i], b = ring[j];
+    if ((a[1] > lat) !== (b[1] > lat) && lng < (b[0] - a[0]) * (lat - a[1]) / (b[1] - a[1]) + a[0]) inside = !inside;
+  }
+  return inside;
+};
+function ringAcres(rings) {
+  let m2 = 0;
+  for (const r of rings) {
+    const k = Math.cos(r[0][1] * Math.PI / 180) * 111320; let s = 0;
+    for (let i = 0, j = r.length - 1; i < r.length; j = i++) s += (r[j][0] * k) * (r[i][1] * 110540) - (r[i][0] * k) * (r[j][1] * 110540);
+    m2 += s / 2;
+  }
+  return Math.abs(m2) / 4046.86;
+}
+
 async function lookup() {
-  const id = ++reqId, seasonal = $("season").value === "now";
-  const q = new URLSearchParams({
-    lat: spot.lat.toFixed(5), lng: spot.lng.toFixed(5), radius: (miles() * 1.60934).toFixed(2),
-    iconic_taxa: "Plantae", quality_grade: "research", per_page: "40", preferred_place_id: "14", locale: "en"
-  });
-  if (seasonal) q.set("month", seasonMonths());
-  say("Looking up plants recorded here…"); listEl.replaceChildren(); $("head").hidden = true;
-  let data;
+  const id = ++reqId, mi = miles();
+  say("Checking the crop map…"); $("hero").hidden = true; $("around").hidden = true; fieldsLayer.clearLayers();
+  let svc, data;
   try {
-    const r = await fetch("https://api.inaturalist.org/v1/observations/species_counts?" + q);
-    if (!r.ok) throw new Error(r.status);
-    data = await r.json();
-  } catch (_) {
-    if (id === reqId) say("Couldn't reach the plant records. Check your signal and try again.", true);
-    return;
+    svc = await service();
+    const dLat = mi / 69.05, dLng = mi / (69.17 * Math.cos(spot.lat * Math.PI / 180));
+    const q = new URLSearchParams({
+      geometry: [spot.lng - dLng, spot.lat - dLat, spot.lng + dLng, spot.lat + dLat].map(n => n.toFixed(6)).join(","),
+      geometryType: "esriGeometryEnvelope", inSR: "4326", spatialRel: "esriSpatialRelIntersects",
+      outFields: [svc.crop, svc.acres].filter(Boolean).join(","), returnGeometry: "true", outSR: "4326",
+      maxAllowableOffset: "0.00008", geometryPrecision: "5", f: "json"
+    });
+    data = await getJSON(`${svc.url}/query?${q}`);
+  } catch (e) {
+    if (id !== reqId) return;
+    say("Couldn't reach California's crop map. Check your signal and try again.", true);
+    dbg("Details: " + (e && e.message ? e.message : e)); return;
   }
   if (id !== reqId) return;
-  const rows = (data.results || []).filter(x => x && x.taxon);
-  $("title").textContent = rows.length ? `${data.total_results || rows.length} kinds of plants recorded here` : "No plant records here";
-  $("sub").textContent = `${spot.lat.toFixed(4)}, ${spot.lng.toFixed(4)} · within ${miles()} mi · ${seasonal ? "this time of year" : "any time of year"}`;
-  $("head").hidden = false;
-  if (!rows.length) { say(seasonal ? "Nothing recorded this season. Try “Seen any time” or a wider distance." : "Nothing recorded this close. Try a wider distance."); return; }
-  say(rows.length < 6 ? "Only a few records here. A wider distance will show more." : "");
-  const frag = document.createDocumentFragment();
-  for (const row of rows) frag.append(item(row));
-  listEl.replaceChildren(frag);
-}
-const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
-function item(row) {
-  const t = row.taxon, li = el("li"), a = el("a");
-  a.href = "https://www.inaturalist.org/taxa/" + encodeURIComponent(t.id); a.target = "_blank"; a.rel = "noopener";
-  const src = t.default_photo && (t.default_photo.square_url || t.default_photo.url);
-  if (src && /^https:\/\//.test(src)) { const img = el("img"); img.src = src; img.alt = ""; img.loading = "lazy"; a.append(img); }
-  else a.append(el("div", "noimg"));
-  const txt = el("div", "txt"), common = t.preferred_common_name;
-  txt.append(el("span", "name", common ? common.replace(/^./, c => c.toUpperCase()) : t.name));
-  if (common) txt.append(el("span", "sci", t.name));
-  const meta = el("div", "meta");
-  const em = t.preferred_establishment_means || (t.establishment_means && t.establishment_means.establishment_means);
-  if (typeof em === "string" && em) meta.append(el("span", "chip " + (["native", "endemic", "introduced"].includes(em) ? em : ""), em));
-  meta.append(el("span", null, `${row.count} sighting${row.count === 1 ? "" : "s"}`));
-  txt.append(meta); a.append(txt); li.append(a);
-  return li;
+  const groups = new Map(); let here = null, total = 0, n = 0;
+  for (const f of data.features || []) {
+    const code = f.attributes && f.attributes[svc.crop], rings = f.geometry && f.geometry.rings;
+    if (code == null || !rings || !rings.length || /^\*+$|^\s*$/.test(String(code))) continue;
+    const cls = classOf(code); if (cls === "U") continue;
+    const name = nameOf(code, svc.domain), color = CLASSES[cls][1];
+    const acres = (svc.acres && +f.attributes[svc.acres]) || ringAcres(rings);
+    const g = groups.get(name) || { name, cls, color, acres: 0, n: 0 }; g.acres += acres; g.n++; groups.set(name, g); total += acres; n++;
+    let inside = false; for (const r of rings) if (inRing(spot.lng, spot.lat, r)) inside = !inside;
+    if (inside && !here) here = { name, cls, color, acres };
+    for (const r of rings) L.polygon(r.map(p => [p[1], p[0]]), { color, weight: inside ? 3 : 1.5, fillColor: color, fillOpacity: inside ? .5 : .3, interactive: false }).addTo(fieldsLayer);
+  }
+  dbg(`Source: ${svc.url.replace(ROOT + "/", "")} · ${svc.crop} · ${n} fields` + (data.exceededTransferLimit ? " (partial)" : ""));
+  const label = $("radius").selectedOptions[0].textContent;
+  if (!n) {
+    say(`No farm fields mapped within ${label} of the pin. The survey covers farmland only, so towns, forest and open range come up empty. Try a wider distance or tap directly on a field.`);
+    return;
+  }
+  say("");
+  const hero = $("hero"); hero.hidden = false;
+  const list = [...groups.values()].sort((a, b) => b.acres - a.acres);
+  if (here) {
+    hero.style.setProperty("--c", here.color); $("heroLabel").textContent = "At your pin";
+    $("heroName").textContent = here.name;
+    $("heroSub").textContent = `${CLASSES[here.cls][0]} · field of about ${Math.max(1, Math.round(here.acres))} acres · ${svc.year} survey`;
+  } else {
+    hero.style.setProperty("--c", list[0].color); $("heroLabel").textContent = "Most common nearby";
+    $("heroName").textContent = list[0].name;
+    $("heroSub").textContent = `Your pin isn't on a mapped field. Tap a coloured field for that exact one. · ${svc.year} survey`;
+  }
+  $("around").hidden = false; $("aroundTitle").textContent = `Farmland within ${label}`;
+  const bar = $("bar"), ul = $("list"); bar.replaceChildren(); ul.replaceChildren();
+  for (const g of list) {
+    const pct = g.acres / total * 100;
+    const seg = document.createElement("i"); seg.style.flex = `${pct} 0 0`; seg.style.background = g.color; bar.append(seg);
+    const li = document.createElement("li"), sw = document.createElement("span"), cn = document.createElement("div"), b = document.createElement("b"), s = document.createElement("span"), p = document.createElement("span");
+    sw.className = "sw"; sw.style.background = g.color; cn.className = "cn"; p.className = "pct";
+    b.textContent = g.name; s.textContent = `${g.n} field${g.n === 1 ? "" : "s"} · about ${Math.max(1, Math.round(g.acres)).toLocaleString()} acres`;
+    p.textContent = pct < 1 ? "<1%" : Math.round(pct) + "%";
+    cn.append(b, s); li.append(sw, cn, p); ul.append(li);
+  }
 }
 if (last) place(last.lat, last.lng, false);
 })();
