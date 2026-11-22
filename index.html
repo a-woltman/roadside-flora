@@ -203,45 +203,67 @@ locBtn.onclick = () => {
 $("radius").onchange = () => { if (spot) place(spot.lat, spot.lng, true); };
 
 /* ---------- crop survey service (found at run time) ---------- */
-const ROOT = "https://gis.water.ca.gov/arcgis/rest/services/Planning";
+const BASE = "https://gis.water.ca.gov/arcgis/rest/services", ROOT = BASE + "/Planning";
+const log = [];
 async function getJSON(url) {
   const r = await fetch(url); if (!r.ok) throw new Error("HTTP " + r.status);
   const j = await r.json(); if (j && j.error) throw new Error(j.error.message || "service error"); return j;
 }
+const short = u => u.replace(BASE + "/", "").replace(/^https:\/\//, "");
 async function describe(svcUrl, year) {
   const svc = await getJSON(svcUrl + "?f=json");
-  const layerId = svc.layers && svc.layers.length ? svc.layers[0].id : 0;
-  const layer = await getJSON(`${svcUrl}/${layerId}?f=json`);
-  const fields = layer.fields || [], by = n => fields.find(f => f.name.toUpperCase() === n);
-  const crop = ["MAIN_CROP", "CROPTYP2", "CROPTYP1", "CLASS2", "CLASS1"].map(by).find(Boolean)
-    || fields.find(f => /CROP/i.test(f.name) && /String/.test(f.type));
-  if (!crop) throw new Error("no crop field in " + svcUrl);
-  const acres = fields.find(f => /^ACRES$/i.test(f.name)) || fields.find(f => /ACRES/i.test(f.name));
-  const domain = {};
-  if (crop.domain && crop.domain.codedValues) for (const cv of crop.domain.codedValues) domain[String(cv.code).trim()] = cv.name;
-  return { url: `${svcUrl}/${layerId}`, crop: crop.name, acres: acres ? acres.name : null, domain, year, t: Date.now() };
+  const ids = (svc.layers && svc.layers.length ? svc.layers : [{ id: 0 }]).map(l => l.id).slice(0, 4);
+  for (const layerId of ids) {
+    const layer = await getJSON(`${svcUrl}/${layerId}?f=json`);
+    const fields = layer.fields || [], by = n => fields.find(f => f.name.toUpperCase() === n);
+    const crop = ["MAIN_CROP", "CROPTYP2", "CROPTYP1", "CLASS2", "CLASS1"].map(by).find(Boolean)
+      || fields.find(f => /CROP/i.test(f.name) && /String/.test(f.type));
+    if (!crop) { log.push(`${short(svcUrl)}/${layerId}: no crop field (${fields.slice(0, 12).map(f => f.name).join(",")})`); continue; }
+    const acres = fields.find(f => /^ACRES$/i.test(f.name)) || fields.find(f => /ACRES/i.test(f.name));
+    const domain = {};
+    if (crop.domain && crop.domain.codedValues) for (const cv of crop.domain.codedValues) domain[String(cv.code).trim()] = cv.name;
+    return { url: `${svcUrl}/${layerId}`, crop: crop.name, acres: acres ? acres.name : null, domain, year: year || "latest", t: Date.now() };
+  }
+  throw new Error("no crop layer");
+}
+const yearIn = s => { const m = /(20[12]\d)/.exec(s); return m ? +m[1] : 0; };
+async function candidates() {
+  const found = [], add = (name, url) => found.push({ year: yearIn(name), prov: /prov/i.test(name) ? 1 : 0, url });
+  try { // 1. walk the state's own server
+    const root = await getJSON(BASE + "?f=json"), lists = [root];
+    const subs = await Promise.allSettled((root.folders || []).map(f => getJSON(`${BASE}/${f}?f=json`)));
+    for (const r of subs) if (r.status === "fulfilled") lists.push(r.value);
+    const all = lists.flatMap(l => l.services || []);
+    const hits = all.filter(s => /crop/i.test(s.name) && /map/i.test(s.name) && /Server$/.test(s.type));
+    for (const s of hits) add(s.name, `${BASE}/${s.name}/${s.type}`);
+    log.push(`state server: ${(root.folders || []).length} folders, ${all.length} services, ${hits.length} crop maps` +
+      (hits.length ? "" : `; near matches: ${all.filter(s => /crop|i15|land.?use/i.test(s.name)).map(s => s.name).slice(0, 12).join(", ") || "none"}`));
+  } catch (e) { log.push("state server list failed: " + e.message); }
+  try { // 2. ArcGIS Online catalogue
+    const q = encodeURIComponent('"Crop Mapping" i15 type:"Feature Service"');
+    const res = await getJSON(`https://www.arcgis.com/sharing/rest/search?f=json&num=50&q=${q}`);
+    const hits = (res.results || []).filter(i => i.url && /crop.?mapping/i.test(i.title + " " + i.url) && /i15|statewide|land ?iq|dwr/i.test(i.title + " " + i.url + " " + (i.owner || "")));
+    for (const i of hits) add(i.title + " " + i.url, i.url.replace(/^http:/, "https:").replace(/\/\d+$/, ""));
+    log.push(`catalogue: ${hits.length} of ${(res.results || []).length}`);
+  } catch (e) { log.push("catalogue failed: " + e.message); }
+  found.sort((a, b) => b.year - a.year || a.prov - b.prov);
+  for (const y of [2023, 2022, 2021, 2020, 2018, 2016, 2014]) for (const t of ["FeatureServer", "MapServer"]) found.push({ year: y, url: `${ROOT}/i15_Crop_Mapping_${y}/${t}` });
+  return found;
 }
 let svcPromise = null;
 function service() {
   if (svcPromise) return svcPromise;
-  const cached = store.get("rf.svc");
+  const cached = store.get("rf.svc2");
   if (cached && cached.url && Date.now() - cached.t < 7 * 864e5) return (svcPromise = Promise.resolve(cached));
   svcPromise = (async () => {
-    let found = [];
-    try {
-      const dir = await getJSON(ROOT + "?f=json");
-      for (const s of dir.services || []) {
-        const m = /i15_Crop_Mapping_(\d{4})(.*)$/i.exec(s.name);
-        if (m) found.push({ year: +m[1], prov: /prov/i.test(m[2]) ? 1 : 0, url: `${ROOT}/${s.name.split("/").pop()}/${s.type}`, fs: s.type === "FeatureServer" ? 0 : 1 });
-      }
-      found.sort((a, b) => b.year - a.year || a.prov - b.prov || a.fs - b.fs);
-    } catch (_) { /* fall through to guesses */ }
-    if (!found.length) for (let y = new Date().getFullYear(); y >= 2018; y--) found.push({ year: y, url: `${ROOT}/i15_Crop_Mapping_${y}/FeatureServer` });
-    let lastErr;
-    for (const f of found.slice(0, 8)) {
-      try { const d = await describe(f.url, f.year); store.set("rf.svc", d); return d; } catch (e) { lastErr = e; }
+    log.length = 0;
+    const found = await candidates(), seen = new Set();
+    for (const f of found) {
+      if (seen.has(f.url) || seen.size >= 16) continue; seen.add(f.url);
+      try { const d = await describe(f.url, f.year); store.set("rf.svc2", d); return d; }
+      catch (e) { log.push(`${short(f.url)}: ${e.message}`.slice(0, 110)); }
     }
-    throw lastErr || new Error("crop survey not found");
+    throw new Error(log.join(" | ").slice(0, 1400));
   })();
   svcPromise.catch(() => { svcPromise = null; });
   return svcPromise;
@@ -297,7 +319,7 @@ async function lookup() {
     if (inside && !here) here = { name, cls, color, acres };
     for (const r of rings) L.polygon(r.map(p => [p[1], p[0]]), { color, weight: inside ? 3 : 1.5, fillColor: color, fillOpacity: inside ? .5 : .3, interactive: false }).addTo(fieldsLayer);
   }
-  dbg(`Source: ${svc.url.replace(ROOT + "/", "")} · ${svc.crop} · ${n} fields` + (data.exceededTransferLimit ? " (partial)" : ""));
+  dbg(`Source: ${short(svc.url)} · ${svc.crop} · ${n} fields` + (data.exceededTransferLimit ? " (partial)" : ""));
   const label = $("radius").selectedOptions[0].textContent;
   if (!n) {
     say(`No farm fields mapped within ${label} of the pin. The survey covers farmland only, so towns, forest and open range come up empty. Try a wider distance or tap directly on a field.`);
